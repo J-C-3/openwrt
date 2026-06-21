@@ -96,6 +96,14 @@ define Device/friendlyarm_nanopi-m5
 endef
 TARGET_DEVICES += friendlyarm_nanopi-m5
 
+define Device/friendlyarm_nanopi-neo3-plus
+  $(Device/rk3528)
+  DEVICE_VENDOR := FriendlyElec
+  DEVICE_MODEL := NanoPi NEO3 Plus
+  DEVICE_PACKAGES := kmod-button-hotplug kmod-input-adc-keys f2fs-tools
+endef
+TARGET_DEVICES += friendlyarm_nanopi-neo3-plus
+
 define Device/friendlyarm_nanopi-r2c
   $(Device/rk3328)
   DEVICE_VENDOR := FriendlyARM
