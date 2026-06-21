@@ -1,0 +1,42 @@
+From: Daniel Bozeman <daniel@orb.net>
+Date: Tue, 31 Mar 2026 18:02:23 +0000
+Subject: [PATCH] pmdomain/rockchip: skip domains returning -EPROBE_DEFER
+
+rockchip_pm_domain_probe() iterates the power-domain child nodes and
+calls rockchip_pm_add_one_domain() for each. When one domain's clock
+lookup returns -EPROBE_DEFER (e.g. RK3528 PD_GPU waiting on the SCMI
+clock controller), the whole controller probe fails and tears down
+every domain that already registered successfully.
+
+On RK3528 this leaves PD_RKVENC unregistered while a GPIO4 consumer
+(USB VBUS regulator) probes, accessing a powered-down domain and
+faulting with a synchronous external abort (clk_gate_endisable), and
+can corrupt timer state (run_timer_softirq NULL deref).
+
+Skip nodes that defer and continue registering the rest; their
+consumers get -ENOENT and defer their own probe until the domain is
+available.
+
+Fixes: 7c696693a4f5 ("pmdomain: rockchip: Add power domain support")
+Signed-off-by: Daniel Bozeman <daniel@orb.net>
+
+Backported from linux-pm:
+https://lore.kernel.org/linux-pm/20260331180223.1682283-1-daniel@orb.net/ (2/2)
+---
+ drivers/pmdomain/rockchip/pm-domains.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+--- a/drivers/pmdomain/rockchip/pm-domains.c
++++ b/drivers/pmdomain/rockchip/pm-domains.c
+@@ -1057,6 +1057,11 @@ static int rockchip_pm_domain_probe(struct platform_device *pdev)
+ 	for_each_available_child_of_node_scoped(np, node) {
+ 		error = rockchip_pm_add_one_domain(pmu, node);
+ 		if (error) {
++			if (error == -EPROBE_DEFER) {
++				dev_dbg(dev, "skipped node %pOFn, dependencies not yet available\n",
++					node);
++				continue;
++			}
+ 			dev_err(dev, "failed to handle node %pOFn: %d\n",
+ 				node, error);
+ 			goto err_out;
